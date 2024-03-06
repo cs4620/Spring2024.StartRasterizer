@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>CPU-bound Rasterizer</title>
+</head>
+
+<body>
+  <canvas id="canv"></canvas>
+  <script>
+    let canvas = document.querySelector("#canv")
+    let ctx = canvas.getContext("2d")
+
+    let pixelWidth = 15;
+    let scaleFactor = 50;
+    canvas.width = pixelWidth * scaleFactor;
+    canvas.height = pixelWidth * scaleFactor;
+
+    ctx.fillStyle = "gray"
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    let obj =
+      `
+v 1.000000 1.000000 0.000000
+v 11.000000 1.000000 0.000000
+v 1.000000 11.000000 0.000000
+v 11.000000 11.000000 0.000000
+vn -0.0000 -0.0000 1.0000
+vt 1.000000 0.000000
+vt 0.000000 1.000000
+vt 0.000000 0.000000
+vt 1.000000 1.000000
+f 2/1/1 3/2/1 1/3/1
+f 2/1/1 4/4/1 3/2/1
+`
+
+    class Vertex {
+      constructor(x, y, z, u, v, nx, ny, nz) {
+        [this.x, this.y, this.z] = [x, y, z];
+        [this.u, this.v] = [u, v];
+        [this.nx, this.ny, this.nz] = [nx, ny, nz];
+      }
+    }
+
+    class Triangle {
+      constructor(one, two, three) {
+        [this.one, this.two, this.three] = [one, two, three]
+        this.vertices = [this.one, this.two, this.three]
+      }
+    }
+
+    class Pixel {
+      constructor(x, y, z, u, v, nx, ny, nz, r, g, b) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+
+        this.u = u;
+        this.v = v;
+
+        this.nx = nx;
+        this.ny = ny;
+        this.nz = nz;
+
+        this.r = r;
+        this.b = b
+        this.g = g;
+      }
+    }
+
+    let zBuffer = []
+
+    //Clear the z-buffer
+    for (let x = 0; x < pixelWidth; x++) {
+      let col = []
+      for (let y = 0; y < pixelWidth; y++) {
+        col.push(new Pixel(x, y, 0,
+          0, 0,
+          0, 0, 0,
+          0, 0, 0))
+      }
+      zBuffer.push(col);
+    }
+
+    //Draw the obj to the zBuffer
+    let vs = []
+    let vts = []
+    let vns = []
+    let fs = []
+
+    let objLines = obj.split("\n");
+
+    let triangles = [];
+
+    for (let line of objLines) {
+      if (line.startsWith("v ")) {
+        let split = line.split(" ")
+        let x = +split[1];
+        let y = +split[2];
+        let z = +split[3]
+        vs.push({ x, y, z })
+      }
+      if (line.startsWith("vt ")) {
+        let split = line.split(" ")
+        let u = +split[1];
+        let v = +split[2];
+        vts.push({ u, v })
+      }
+      if (line.startsWith("vn ")) {
+        let split = line.split(" ")
+        let nx = +split[1];
+        let ny = +split[2];
+        let nz = +split[3]
+        vns.push({ nx, ny, nz })
+      }
+      if (line.startsWith("f ")) {
+        let face = line.split(" ")
+        let vertices = []
+        face.shift()
+        for (let vertexString of face) {
+          let vertexParts = vertexString.split("/")
+
+          let vIndex = parseInt(vertexParts[0]);
+          let vtIndex = parseInt(vertexParts[1]);
+          let vnIndex = parseInt(vertexParts[2]);
+
+          vIndex--;
+          vtIndex--;
+          vnIndex--;
+
+          let vertex = new Vertex(vs[vIndex].x, vs[vIndex].y, vs[vIndex].z,
+            vts[vtIndex].u, vts[vtIndex].v,
+            vns[vnIndex].nx, vns[vnIndex].ny, vns[vnIndex].nz,
+          )
+          vertices.push(vertex)
+
+        }
+        let triangle = new Triangle(vertices[0], vertices[1], vertices[2]);
+        triangles.push(triangle);
+
+      }
+    }
+
+    let a = "Done parsing obj"
+
+    for(let triangle of triangles){
+      for(let vertex of triangle.vertices){
+        let pixel = zBuffer[vertex.x][vertex.y];
+        pixel.r = 255;
+        
+      }
+    }
+
+
+    ctx.save();
+
+    ctx.scale(scaleFactor, scaleFactor)
+
+    //Draw the z-buffer
+    for (let col of zBuffer) {
+      for (let pixel of col) {
+        ctx.fillStyle = `rgb(${pixel.r}, ${pixel.g}, ${pixel.b})`
+        ctx.fillRect(pixel.x, pixel.y, 1, 1)
+      }
+    }
+
+    ctx.restore();
+
+
+
+  </script>
+</body>
+
+</html>
